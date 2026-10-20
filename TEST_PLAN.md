@@ -67,3 +67,50 @@ To try it in the app, compare the two files with key column **Invoice Number**.
 | N10 | Blank key values | Blanks reported as duplicate keys, still compared in order |
 | N11 | No common columns | Only header issues, report still written |
 | N12 | File 2 has headers but no rows | All File 1 rows listed as "only in File 1" |
+
+---
+
+# New features: all sheets, mapping file, formulas, plain English
+Automated in [tests/test_features.py](tests/test_features.py).
+
+## Extra test data (`python tests/make_test_data.py`)
+| File | What it is |
+|---|---|
+| `MultiSheet_file1.xlsx` | Sheets **B2B**, **B2C**, **Credit Notes** |
+| `MultiSheet_file2.xlsx` | Sheets **B2B** (same), **" b2c"** (different case, extra space, Invoice Amount of LDX1-7 changed), **Extra** |
+| `B2B_summary_file2.xlsx` | Summary of `B2B_file1.xlsx` with **different headers** (Inv No, Customer Name, Net…) and **calculated columns** (Total Tax, Avg IGST+CGST, Tax Type, Ship To), shuffled rows |
+| `mapping_B2B.xlsx` | Mapping between the two: column renames, blank (same name), 5 formulas, Key, a 0.05 tolerance on Net Amount |
+| `mapping_B2B_plain_english.xlsx` | Same as above, plus one row written in plain English (needs a Claude API key) |
+
+Planted errors in the summary file: Total Tax of LDX1-3, Avg Tax of LDX1-9, Customer of LDX1-15 and Tax Type of LDX1-21. Net Amount of LDX1-30 is +0.03, inside the 0.05 tolerance, so it should **not** be reported.
+
+## Positive test cases
+| ID | Scenario | Expected result |
+|---|---|---|
+| P20 | Compare all sheets | Sheets matched by name ignoring case and spaces; only the planted B2C change found; sheets in one file listed |
+| P21 | All-sheets report | Summary has one row per sheet (MATCH / ISSUES FOUND / NOT COMPARED); tables have a Sheet column; one highlighted copy per sheet |
+| P22 | Mapping with renamed columns and formulas | Exactly the 4 planted errors found; all 300 rows matched by key |
+| P23 | Formula values | File 1 value equals the calculation, e.g. (Igst + Cgst) / 2 |
+| P24 | Tolerance per row | The 0.03 difference is hidden with tolerance 0.05 and reported without it |
+| P25 | Blank mapping cell | Uses the same column name in both files |
+| P26 | Plain-English logic | Converted to a formula once; shown on the Mapping Used sheet with an "AI converted" note; finds the same error |
+| P27 | Claude request (mocked) | Uses model `claude-opus-5-5`, sends the column list, result is cached |
+| P28 | Make template | File 2 columns matched by similar name (`invoice_number` = `Invoice Number`); Key filled in; How-to sheet included |
+| P29 | Formula engine (11 formulas) | Maths, Excel rounding, IF, joining text with &, text compare ignoring case, divide by zero shown as #ERROR, IFERROR, blank counts as 0, SUM/MAX, no float noise |
+| P30 | Mapping + all sheets | Mapping applied to every sheet; each sheet shows only its own errors |
+| P31 | UI controls | "All sheets" disables the sheet pickers; a mapping file disables the key list |
+
+## Negative test cases
+| ID | Scenario | Expected result |
+|---|---|---|
+| N13 | Mapping file missing its required columns | Clear error naming the required columns |
+| N14 | Formula uses a column that doesn't exist | Error names the file, the output row and the column |
+| N15 | Malicious formula (`__import__("os")...`) | Rejected; nothing runs |
+| N16 | Plain English with no API key | Clear error: enter a key or write it as a formula |
+| N17 | AI returns a bad formula, or says CANNOT | Rejected with a clear message |
+| N18 | All sheets, one sheet fails (key missing) | Other sheets still compared; failure shown in the report |
+| N19 | Same Output Column listed twice | Error |
+| N20 | Tolerance is text ("abc") | Error |
+| N21 | Formula syntax errors (6 kinds) | FormulaError, no crash |
+| N22 | No sheet names in common | All sheets "missing"; report still written |
+| N23 | UI given a bad mapping file | Warning shown; comparison not started |

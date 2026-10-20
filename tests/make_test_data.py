@@ -155,15 +155,105 @@ def write_xlsx(df: pd.DataFrame, path: str) -> None:
         df.to_excel(xw, index=False, sheet_name="Sheet1")
 
 
-def main():
-    os.makedirs(OUT_DIR, exist_ok=True)
+def make_base_fixed() -> pd.DataFrame:
     base = make_base()
     # make sure the case-only change really is case-only
     base.loc[base[KEY] == CASE_ONLY_CHANGE[0], CASE_ONLY_CHANGE[1]] = "Kush Scientific Agencies"
+    # give some rows CGST/SGST (intra-state) so tax formulas have real inputs
+    intra = base.index % 3 == 0
+    base[["Cgst Tax", "Sgst Tax", "Igst Tax"]] = base[["Cgst Tax", "Sgst Tax", "Igst Tax"]].astype(float)
+    base.loc[intra, "Cgst Tax"] = (base.loc[intra, "Total Tax Amount"] / 2).round(2)
+    base.loc[intra, "Sgst Tax"] = base.loc[intra, "Total Tax Amount"] - base.loc[intra, "Cgst Tax"]
+    base.loc[intra, "Igst Tax"] = 0.0
+    return base
+
+
+# ------------------------------------------------------------------ all-sheets scenario
+# File 1 sheets: B2B, B2C, Credit Notes      File 2 sheets: B2B, " b2c" (case/space), Extra
+MULTI_B2C_CHANGE = ("LDX1-7", "Invoice Amount", 1.0)
+
+
+def make_multi(base: pd.DataFrame):
+    b2c1 = base.head(50).copy()
+    b2c2 = b2c1.copy().set_index(KEY, drop=False)
+    k, c, v = MULTI_B2C_CHANGE
+    b2c2.loc[k, c] = v
+    cn = base[base["Transaction Type"] == "Refund"].head(20)
+    f1 = {"B2B": base, "B2C": b2c1, "Credit Notes": cn}
+    f2 = {"B2B": base.copy(), " b2c": b2c2.reset_index(drop=True),
+          "Extra": pd.DataFrame({"x": [1, 2]})}
+    return f1, f2
+
+
+def write_sheets(sheets: dict, path: str) -> None:
+    with pd.ExcelWriter(path, engine="xlsxwriter", datetime_format="m/d/yyyy h:mm") as xw:
+        for name, df in sheets.items():
+            df.to_excel(xw, index=False, sheet_name=name)
+
+
+# ------------------------------------------------------------------ mapping scenario
+# File 2 is a summary with different column names and calculated columns.
+MAP_ROWS = [
+    # Output Column, File 1 (column / formula), File 2, Key, Tolerance
+    ("Invoice No", "Invoice Number", "Inv No", "Y", ""),
+    ("Customer", "Buyer Name", "Customer Name", "", ""),
+    ("Invoice Date", "", "", "", ""),                      # blank = same name in both
+    ("Total Tax", "[Cgst Tax] + [Sgst Tax] + [Igst Tax]", "Total Tax", "", ""),
+    ("Avg Tax", "([Igst Tax] + [Cgst Tax]) / 2", "Avg IGST+CGST", "", ""),
+    ("Net Amount", "ROUND([Invoice Amount] - [Total Tax Amount], 2)", "Net", "", "0.05"),
+    ("Tax Type", 'IF([Igst Tax] = 0, "INTRA", "INTER")', "Tax Type", "", ""),
+    ("Ship To", '[Ship To City] & ", " & [Ship To State]', "Ship To", "", ""),
+]
+MAP_ERRORS = [                 # planted wrong values in the summary file (key, output, value)
+    ("LDX1-3", "Total Tax", 1.23),
+    ("LDX1-9", "Avg Tax", 999.0),
+    ("LDX1-15", "Customer", "Wrong Buyer Pvt Ltd"),
+    ("LDX1-21", "Tax Type", "INTER?"),
+]
+MAP_WITHIN_TOL = ("LDX1-30", "Net Amount", 0.03)   # inside the row's 0.05 tolerance
+
+
+def make_summary(base: pd.DataFrame) -> pd.DataFrame:
+    tax = base["Cgst Tax"] + base["Sgst Tax"] + base["Igst Tax"]
+    s = pd.DataFrame({
+        "Inv No": base[KEY],
+        "Customer Name": base["Buyer Name"],
+        "Invoice Date": base["Invoice Date"],
+        "Total Tax": tax.round(2),
+        "Avg IGST+CGST": ((base["Igst Tax"] + base["Cgst Tax"]) / 2).round(4),
+        "Net": (base["Invoice Amount"] - base["Total Tax Amount"]).round(2),
+        "Tax Type": np.where(base["Igst Tax"] == 0, "INTRA", "INTER"),
+        "Ship To": base["Ship To City"] + ", " + base["Ship To State"],
+    }).astype(object)
+    out_col = {"Total Tax": "Total Tax", "Avg Tax": "Avg IGST+CGST",
+               "Customer": "Customer Name", "Tax Type": "Tax Type", "Net Amount": "Net"}
+    s = s.set_index("Inv No", drop=False)
+    for k, col, v in MAP_ERRORS:
+        s.loc[k, out_col[col]] = v
+    k, col, delta = MAP_WITHIN_TOL
+    s.loc[k, out_col[col]] = s.loc[k, out_col[col]] + delta
+    return s.sample(frac=1, random_state=11).reset_index(drop=True)
+
+
+def write_mapping(path: str, rows=MAP_ROWS) -> None:
+    df = pd.DataFrame(rows, columns=["Output Column", "File 1", "File 2", "Key", "Tolerance"])
+    df.to_excel(path, index=False, sheet_name="Mapping")
+
+
+def main():
+    os.makedirs(OUT_DIR, exist_ok=True)
+    base = make_base_fixed()
     f2 = make_file2(base)
     write_xlsx(base, os.path.join(OUT_DIR, "B2B_file1.xlsx"))
     write_xlsx(f2, os.path.join(OUT_DIR, "B2B_file2.xlsx"))
-    print(f"Wrote {len(base)} / {len(f2)} rows to {OUT_DIR}")
+    m1, m2 = make_multi(base)
+    write_sheets(m1, os.path.join(OUT_DIR, "MultiSheet_file1.xlsx"))
+    write_sheets(m2, os.path.join(OUT_DIR, "MultiSheet_file2.xlsx"))
+    write_xlsx(make_summary(base), os.path.join(OUT_DIR, "B2B_summary_file2.xlsx"))
+    write_mapping(os.path.join(OUT_DIR, "mapping_B2B.xlsx"))
+    write_mapping(os.path.join(OUT_DIR, "mapping_B2B_plain_english.xlsx"), MAP_ROWS + [
+        ("Avg Tax (English)", "add igst tax and cgst tax then divide by 2", "Avg IGST+CGST", "", "")])
+    print(f"Wrote test files to {OUT_DIR}")
     return base, f2
 
 

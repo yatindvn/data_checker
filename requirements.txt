@@ -2,3 +2,4 @@ pandas>=2.0
 openpyxl
 xlsxwriter
 python-calamine
+anthropic>=1.0

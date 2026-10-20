@@ -29,8 +29,7 @@ RED = "FFFFC7CE"
 def b2b(tmp_path_factory):
     """The main B2B pair: file 1 original, file 2 with the planted changes."""
     d = tmp_path_factory.mktemp("b2b")
-    base = td.make_base()
-    base.loc[base[td.KEY] == td.CASE_ONLY_CHANGE[0], td.CASE_ONLY_CHANGE[1]] = "Kush Scientific Agencies"
+    base = td.make_base_fixed()
     f2 = td.make_file2(base)
     p1, p2 = str(d / "B2B_file1.xlsx"), str(d / "B2B_file2.xlsx")
     td.write_xlsx(base, p1)

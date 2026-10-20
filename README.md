@@ -3,7 +3,18 @@
 Desktop tool that compares two Excel/CSV files (headers + data) and writes an
 Excel report with every issue highlighted in red.
 
-## Setup
+## For users (no Python needed)
+1. Get `ExcelCompare.zip` and unzip it anywhere.
+2. Double-click `ExcelCompare\ExcelCompare.exe`. Keep the exe inside its folder, because it needs the `_internal` folder next to it.
+3. If Windows SmartScreen warns about an unknown app, click **More info → Run anyway** (the exe is not code-signed).
+
+## Build the exe
+```bash
+build_exe.bat
+```
+The output is `dist\ExcelCompare.zip`, which you can share.
+
+## Setup (for developers)
 ```bash
 python -m pip install -r requirements.txt
 ```

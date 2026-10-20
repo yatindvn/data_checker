@@ -3,3 +3,7 @@ __pycache__/
 *_comparison_report.xlsx
 ~$*
 .venv/
+build/
+dist/
+dist_folder/
+*.spec

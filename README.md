@@ -1,4 +1,4 @@
-# Excel Compare
+# data_checker – Excel Compare
 
 Desktop tool that compares two Excel/CSV files (headers + data) and writes an
 Excel report with every issue highlighted in red.

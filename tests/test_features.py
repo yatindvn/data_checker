@@ -293,3 +293,52 @@ def test_N23_ui_bad_mapping_file_rejected(data, tmp_path):
         assert warn.called and "Mapping" in warn.call_args[0][0] and not th.called
     finally:
         ui.destroy()
+
+
+# ---------------------------------------------------------------- leading zeros option
+LZ_A = ["001", "0123", "10", "0.5", "007", "-007", "0", "1.50", "00A"]
+LZ_B = ["1", "123", "10.00", "0.50", "007", "-7", "0.0", "1.5", "0A"]
+LZ_ALWAYS_DIFF = {"00A"}                       # not a number: text differs either way
+LZ_ONLY_WITH_OPTION = {"001", "0123", "-007"}  # leading zero vs no leading zero
+
+
+def _lz_files(tmp_path):
+    ids = [f"R{i}" for i in range(len(LZ_A))]
+    a, b = str(tmp_path / "a.xlsx"), str(tmp_path / "b.xlsx")
+    pd.DataFrame({"id": ids, "code": LZ_A}).to_excel(a, index=False)
+    pd.DataFrame({"id": ids, "code": LZ_B}).to_excel(b, index=False)
+    return a, b, dict(zip(ids, LZ_A))
+
+
+def test_P32_leading_zeros_option(tmp_path):
+    a, b, by_id = _lz_files(tmp_path)
+    off = ce.compare(a, "Sheet1", b, "Sheet1", ce.Options(key_columns=["id"]))
+    on = ce.compare(a, "Sheet1", b, "Sheet1", ce.Options(key_columns=["id"], leading_zeros_matter=True))
+    flagged = lambda r: {by_id[k] for k in r.cell_diffs["Key"]}
+    assert flagged(off) == LZ_ALWAYS_DIFF                          # default: 001 == 1
+    assert flagged(on) == LZ_ALWAYS_DIFF | LZ_ONLY_WITH_OPTION     # option: 001 != 1
+    # 10 vs 10.00, 0.5 vs 0.50, 0 vs 0.0, 1.50 vs 1.5 and 007 vs 007 stay equal
+
+
+def test_P33_leading_zeros_with_mapping(tmp_path):
+    a, b, by_id = _lz_files(tmp_path)
+    m = str(tmp_path / "m.xlsx")
+    td.write_mapping(m, [("ID", "id", "id", "Y", ""), ("Code", "code", "code", "", "")])
+    res = ce.compare(a, "Sheet1", b, "Sheet1", ce.Options(leading_zeros_matter=True),
+                     mapping=ce.load_mapping(m))
+    assert {by_id[k] for k in res.cell_diffs["Key"]} == LZ_ALWAYS_DIFF | LZ_ONLY_WITH_OPTION
+
+
+def test_P34_ui_leading_zeros_checkbox(tmp_path):
+    import app
+    a, b, _ = _lz_files(tmp_path)
+    ui = app.App()
+    try:
+        ui.paths[0].set(a); ui.paths[1].set(b); ui.out_path.set(str(tmp_path / "r.xlsx"))
+        ui.leading_zeros.set(True)
+        with mock.patch.object(app.threading, "Thread") as th:
+            ui._start()
+        opts = th.call_args.kwargs["args"][4]
+        assert opts.leading_zeros_matter is True
+    finally:
+        ui.destroy()

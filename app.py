@@ -35,6 +35,7 @@ class App(tk.Tk):
         self.out_path = tk.StringVar()
         self.ignore_case = tk.BooleanVar(value=False)
         self.trim = tk.BooleanVar(value=True)
+        self.leading_zeros = tk.BooleanVar(value=False)
         self.tolerance = tk.StringVar(value="0")
         self.status = tk.StringVar(value="Select two files to compare.")
         self._build()
@@ -89,6 +90,8 @@ class App(tk.Tk):
         self.ignore_cols.pack(anchor="w", pady=(0, 8))
         ttk.Checkbutton(side, text="Ignore upper/lower case", variable=self.ignore_case).pack(anchor="w")
         ttk.Checkbutton(side, text="Trim leading/trailing spaces", variable=self.trim).pack(anchor="w")
+        ttk.Checkbutton(side, text="Leading zeros matter (001 ≠ 1)",
+                        variable=self.leading_zeros).pack(anchor="w")
         tol = ttk.Frame(side)
         tol.pack(anchor="w", pady=6)
         ttk.Label(tol, text="Number tolerance:").pack(side="left")
@@ -226,6 +229,7 @@ class App(tk.Tk):
             ignore_case=self.ignore_case.get(),
             trim_spaces=self.trim.get(),
             numeric_tolerance=tol,
+            leading_zeros_matter=self.leading_zeros.get(),
             ignore_columns=[] if mapping else
             [c.strip() for c in self.ignore_cols.get().split(",") if c.strip()],
         )

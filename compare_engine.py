@@ -13,7 +13,7 @@ from __future__ import annotations
 import os
 import re
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 import pandas as pd
@@ -39,6 +39,7 @@ class Options:
     numeric_tolerance: float = 0.0
     ignore_columns: list[str] = field(default_factory=list)
     column_tolerance: dict = field(default_factory=dict)  # per column, from a mapping file
+    leading_zeros_matter: bool = False  # True: "001" != "1" (codes, PINs); "10" still == "10.00"
 
 
 @dataclass
@@ -199,10 +200,7 @@ def compare(path_a: str, sheet_a: str, path_b: str, sheet_b: str, opts: Options,
         progress("Applying mapping / formulas...")
         raw_a, used_a = apply_mapping(raw_a, mapping, "File 1", ai)
         raw_b, used_b = apply_mapping(raw_b, mapping, "File 2", ai)
-        opts = Options(key_columns=[m.output for m in mapping if m.key],
-                       ignore_case=opts.ignore_case, trim_spaces=opts.trim_spaces,
-                       numeric_tolerance=opts.numeric_tolerance,
-                       ignore_columns=opts.ignore_columns,
+        opts = replace(opts, key_columns=[m.output for m in mapping if m.key],
                        column_tolerance={m.output: m.tolerance for m in mapping
                                          if m.tolerance is not None})
         mapping_used = pd.DataFrame({
@@ -295,6 +293,9 @@ def compare_frames(raw_a: pd.DataFrame, raw_b: pd.DataFrame, opts: Options,
         na = pd.to_numeric(a2[c], errors="coerce").to_numpy()
         nb = pd.to_numeric(b2[c], errors="coerce").to_numpy()
         both = ~np.isnan(na) & ~np.isnan(nb)
+        if opts.leading_zeros_matter:
+            # values like "001" stay text, so they only match the exact same text
+            both &= ~(_leading_zero(a2[c]) | _leading_zero(b2[c]))
         if both.any():
             tol = max(opts.column_tolerance.get(c, opts.numeric_tolerance), FLOAT_EPS)
             diff[both, j] = np.abs(na[both] - nb[both]) > tol
@@ -347,6 +348,11 @@ def compare_frames(raw_a: pd.DataFrame, raw_b: pd.DataFrame, opts: Options,
     return Result(header_issues, cell_diffs, only_in_a, only_in_b, duplicate_keys, summary,
                   raw_b, diff_mask_b, set(only_b_pos.tolist()),
                   [c for c in cols_b if c not in set(cols_a)])
+
+
+def _leading_zero(s: pd.Series) -> np.ndarray:
+    """'001', '-007', '0123.5' -> True;  '0', '0.5', '10' -> False."""
+    return s.str.match(r"^\s*[+-]?0\d").fillna(False).to_numpy(bool)
 
 
 def _num_diff(va, vb) -> np.ndarray:

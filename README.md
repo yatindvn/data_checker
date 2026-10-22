@@ -29,7 +29,7 @@ python app.py
 1. Browse for **File 1** and **File 2** and pick a sheet for each.
 2. (Optional) select **key column(s)** such as an ID. Rows are then matched by key,
    so it doesn't matter if the rows are in a different order. With no key, rows are compared by position.
-3. Options: ignore columns, ignore case, trim spaces, number tolerance.
+3. Options: ignore columns, ignore case, trim spaces, number tolerance, and **Leading zeros matter**. Tick it when codes such as PIN codes, IDs or HSN codes must keep their zeros (`001` ≠ `1`).
 4. (Optional) tick **Compare ALL sheets**. Sheets are matched by name (ignoring case and spaces); sheets found in only one file are reported.
 5. (Optional) choose a **mapping file** when the two files use different column names or File 2 holds calculated values (see below).
 6. Click **Compare** and then **Open report**.
@@ -113,4 +113,4 @@ Next time you can skip steps 1–3: click **Browse...** next to the mapping box 
 | Duplicate Keys | Keys that appear more than once (only shown if any) |
 | File 2 Highlighted (or `F2 <sheet>`) | File 2 copy with differing cells, extra rows and extra columns in red |
 
-Notes: numbers are compared as numbers (`1` = `1.0`), and all other values as text, so leading zeros are kept.
+Notes: numbers are compared as numbers, so `10` = `10.00`. By default `001` = `1` as well. Tick **Leading zeros matter** to treat any value with a leading zero (`001`, `0123`) as text, so it only matches the exact same text. Plain numbers still compare as numbers with the option on (`10` = `10.00`, `0.5` = `0.50`).

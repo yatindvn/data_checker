@@ -99,6 +99,9 @@ Planted errors in the summary file: Total Tax of LDX1-3, Avg Tax of LDX1-9, Cust
 | P29 | Formula engine (11 formulas) | Maths, Excel rounding, IF, joining text with &, text compare ignoring case, divide by zero shown as #ERROR, IFERROR, blank counts as 0, SUM/MAX, no float noise |
 | P30 | Mapping + all sheets | Mapping applied to every sheet; each sheet shows only its own errors |
 | P31 | UI controls | "All sheets" disables the sheet pickers; a mapping file disables the key list |
+| P32 | Leading zeros matter: off vs on | Off: `001` = `1`. On: `001` ≠ `1`, `0123` ≠ `123`, `-007` ≠ `-7`. Still equal with it on: `10` = `10.00`, `0.5` = `0.50`, `0` = `0.0`, `1.50` = `1.5`, `007` = `007` |
+| P33 | Leading zeros + mapping file | The option also applies in mapping mode |
+| P34 | UI checkbox | Ticking "Leading zeros matter" passes the option to the comparison |
 
 ## Negative test cases
 | ID | Scenario | Expected result |

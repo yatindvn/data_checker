@@ -4,7 +4,9 @@ Desktop tool that compares two Excel/CSV files (headers + data) and writes an
 Excel report with every issue highlighted in red.
 
 ## For users (no Python needed)
-1. Get `ExcelCompare.zip` and unzip it anywhere.
+**[⬇ Download ExcelCompare.zip (latest release)](https://github.com/yatindvn/data_checker/releases/latest/download/ExcelCompare.zip)** · Windows only · [All releases](https://github.com/yatindvn/data_checker/releases)
+
+1. Download `ExcelCompare.zip` using the link above and unzip it anywhere.
 2. Double-click `ExcelCompare\ExcelCompare.exe`. Keep the exe inside its folder, because it needs the `_internal` folder next to it.
 3. If Windows SmartScreen warns about an unknown app, click **More info → Run anyway** (the exe is not code-signed).
 
